@@ -1,0 +1,13 @@
+# build artifacts
+*.obj
+*.pdb
+*.exe
+loader/KerixLoader.dll
+cheat/Kerix.dll
+
+# local stuff
+*.log
+*.krx
+loader/work/
+u3sdk/
+tools/
