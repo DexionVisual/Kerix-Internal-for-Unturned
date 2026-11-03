@@ -56,12 +56,9 @@
 ## использование
 
 1. install: Kerix.dll и Vault.dll должны лежать рядом с Unturned.exe
-2. запустить игру (одиночка / сервер без battleye)
-3. заинжектить KerixLoader.dll в Unturned.exe любым инжектором
-4. INSERT - меню, END - вкл/выкл esp
-
-не работает - в папке игры лежат kerix_loader.log и kerix_cheat.log,
-там написано на каком шаге что случилось.
+2. запустить игру
+3. заинжектить KerixLoader.dll в Unturned.exe
+4. INSERT - меню
 
 ## структура
 
