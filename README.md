@@ -60,6 +60,8 @@
 3. заинжектить KerixLoader.dll в Unturned.exe
 4. INSERT - меню
 
+для reaper injector обезательно win11 25H2 (может и другие версии работают я не проверял)
+
 ## структура
 
     loader/bootstrap.c      нативный лоадер
