@@ -24,8 +24,27 @@ namespace Kerix
         public static void PushFade(float fade)
         {
             _savedGuiColor = GUI.color;
-            _fade = Mathf.Clamp01(fade);
+            _fade = Mathf.Clamp01(_savedGuiColor.a * Mathf.Clamp01(fade));
             GUI.color = new Color(1f, 1f, 1f, _fade);
+        }
+
+        public static float Ease(float cur, float target, float speed, float dt)
+        {
+            cur = Mathf.Lerp(cur, target, 1f - Mathf.Exp(-speed * dt));
+            if (Mathf.Abs(cur - target) < 0.001f) cur = target;
+            return cur;
+        }
+
+        public static Vector2 Ease(Vector2 cur, Vector2 target, float speed, float dt)
+        {
+            cur = Vector2.Lerp(cur, target, 1f - Mathf.Exp(-speed * dt));
+            if ((cur - target).sqrMagnitude < 0.0005f) cur = target;
+            return cur;
+        }
+
+        public static float Smooth(float t)
+        {
+            return t * t * (3f - 2f * t);
         }
 
         public static void PopFade()
@@ -51,7 +70,7 @@ namespace Kerix
         public static void RectFill(Rect r, Color c)
         {
             Color old = GUI.color;
-            c.a *= _fade;
+            c.a *= old.a;
             GUI.color = c;
             GUI.DrawTexture(r, White, ScaleMode.StretchToFill, true);
             GUI.color = old;

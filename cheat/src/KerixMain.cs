@@ -84,8 +84,8 @@ namespace Kerix
             float dt = Time.unscaledDeltaTime;
             Ui.Prepare();
 
-            _menuAnim = Mathf.MoveTowards(_menuAnim, MenuOpen ? 1f : 0f, dt * 5.5f);
-            _espAnim = Mathf.MoveTowards(_espAnim, Esp.Enabled ? 1f : 0f, dt * 7f);
+            _menuAnim = Ui.Ease(_menuAnim, MenuOpen ? 1f : 0f, 8f, dt);
+            _espAnim = Ui.Ease(_espAnim, Esp.Enabled ? 1f : 0f, 10f, dt);
 
             if (_espAnim > 0.01f)
             {
@@ -103,7 +103,7 @@ namespace Kerix
             if (_menuAnim > 0.01f)
             {
 
-                Ui.PushFade(_menuAnim);
+                Ui.PushFade(Ui.Smooth(_menuAnim));
                 Ui.RectFill(new Rect(0f, 0f, Screen.width, Screen.height), new Color(0f, 0f, 0f, 0.38f));
                 Ui.PopFade();
 

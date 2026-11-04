@@ -10,6 +10,7 @@ namespace Kerix
     {
         private static Rect _rect = new Rect(90f, 70f, 570f, 505f);
         private static int _tab = 1;
+        private static int _lastTab = 1;
         private static readonly string[] Tabs = { "Aimbot", "Visuals", "Misc", "Settings" };
         private static bool _drag;
         private static Vector2 _dragOff;
@@ -20,7 +21,7 @@ namespace Kerix
         {
             float cur;
             _anim.TryGetValue(key, out cur);
-            cur = Mathf.MoveTowards(cur, target, Time.unscaledDeltaTime * speed);
+            cur = Ui.Ease(cur, target, speed, Time.unscaledDeltaTime);
             _anim[key] = cur;
             return cur;
         }
@@ -30,7 +31,7 @@ namespace Kerix
             Event e = Event.current;
             Vector2 m = e.mousePosition;
 
-            float slide = (1f - anim) * 26f;
+            float slide = (1f - Ui.Smooth(anim)) * 34f;
 
             Rect head = new Rect(_rect.x, _rect.y, _rect.width, 58f);
             if (e.type == EventType.MouseDown && e.button == 0 && head.Contains(m) && anim > 0.9f)
@@ -75,8 +76,8 @@ namespace Kerix
                 bool hover = tr.Contains(m);
                 bool sel = _tab == i;
 
-                float hv = Anim("tab:" + i, hover && !sel ? 1f : 0f, 8f);
-                float sv = Anim("tabsel:" + i, sel ? 1f : 0f, 10f);
+                float hv = Anim("tab:" + i, hover && !sel ? 1f : 0f, 11f);
+                float sv = Anim("tabsel:" + i, sel ? 1f : 0f, 13f);
 
                 Color bgc = Color.Lerp(new Color(0.085f, 0.09f, 0.125f, 1f), Ui.RoyalDark, Mathf.Max(hv, sv));
                 Color border = Color.Lerp(new Color(1f, 1f, 1f, 0.06f), Ui.Royal, sv);
@@ -102,16 +103,28 @@ namespace Kerix
 
             Rect content = new Rect(r.x + 184f, r.y + 76f, r.width - 200f, r.height - 92f);
 
+            if (_tab != _lastTab)
+            {
+                _lastTab = _tab;
+                _anim["tabsw"] = 0f;
+            }
+            float tsw = Anim("tabsw", 1f, 13f);
+            float tse = Ui.Smooth(tsw);
+
+            Ui.PushFade(tse);
+            Rect shifted = new Rect(content.x, content.y + (1f - tse) * 16f, content.width, content.height);
             switch (_tab)
             {
-                case 0: DrawAimbot(content, e); break;
-                case 1: DrawVisuals(content, e); break;
-                case 2: DrawMisc(content, e); break;
-                case 3: DrawSettings(content, e); break;
+                case 0: DrawAimbot(shifted, e); break;
+                case 1: DrawVisuals(shifted, e); break;
+                case 2: DrawMisc(shifted, e); break;
+                case 3: DrawSettings(shifted, e); break;
             }
+            Ui.PopFade();
         }
 
         private static int _aimSub;
+        private static int _lastAimSub;
         private static readonly string[] AimSubs = { "Vector", "Silent", "Recoil" };
 
         private static void DrawAimbot(Rect area, Event e)
@@ -124,8 +137,8 @@ namespace Kerix
                 bool hover = tr.Contains(e.mousePosition);
                 bool sel = _aimSub == i;
 
-                float hv = Anim("aimsub:" + i, hover && !sel ? 1f : 0f, 8f);
-                float sv = Anim("aimsubsel:" + i, sel ? 1f : 0f, 10f);
+                float hv = Anim("aimsub:" + i, hover && !sel ? 1f : 0f, 11f);
+                float sv = Anim("aimsubsel:" + i, sel ? 1f : 0f, 13f);
 
                 Color bgc = Color.Lerp(new Color(0.085f, 0.09f, 0.125f, 1f), Ui.RoyalDark, Mathf.Max(hv, sv));
                 Color border = Color.Lerp(new Color(1f, 1f, 1f, 0.06f), Ui.Royal, sv);
@@ -144,66 +157,103 @@ namespace Kerix
 
             Rect body = new Rect(area.x, area.y + 40f, area.width, area.height - 44f);
 
+            if (_aimSub != _lastAimSub)
+            {
+                _lastAimSub = _aimSub;
+                _anim["aimsubsw"] = 0f;
+            }
+            float asw = Anim("aimsubsw", 1f, 14f);
+            float ase = Ui.Smooth(asw);
+
+            Ui.PushFade(ase);
+            Rect bodyShifted = new Rect(body.x, body.y + (1f - ase) * 12f, body.width, body.height);
             switch (_aimSub)
             {
-                case 0: DrawVector(body, e); break;
-                case 1: DrawSilent(body, e); break;
-                case 2: DrawRecoil(body, e); break;
+                case 0: DrawVector(bodyShifted, e); break;
+                case 1: DrawSilent(bodyShifted, e); break;
+                case 2: DrawRecoil(bodyShifted, e); break;
             }
+            Ui.PopFade();
         }
 
         private static void DrawVector(Rect area, Event e)
         {
-            area = Scroll(area, ref _scrollA0, 300f);
-            float y = 2f;
-            y = ToggleRow(area, e, "Vector aim", ref Aimbot.VectorEnabled, y);
-            y = ToggleRow(area, e, "Only when aiming (RMB)", ref Aimbot.VectorOnlyAiming, y);
-            y = ToggleRow(area, e, "Draw FOV circle", ref Aimbot.DrawFovCircle, y);
-            y = ChoiceRow(area, e, "Target point", ref Aimbot.VectorTargetPoint, HeadChest, y);
-            y = SliderRow(area, e, "FOV", ref Aimbot.VectorFov, 1f, 90f, "0°", y);
-            y = SliderRow(area, e, "Smoothing", ref Aimbot.VectorSmoothing, 1f, 20f, "0.0", y);
-            y = SliderRow(area, e, "Recoil control", ref Aimbot.VectorRecoil, 0f, 100f, "0%", y);
+            Scroll(area, _scrollA0, 280f, a =>
+            {
+                float y = 2f;
+                y = ToggleRow(a, e, "Vector aim", ref Aimbot.VectorEnabled, y);
+                y = ToggleRow(a, e, "Only when aiming (RMB)", ref Aimbot.VectorOnlyAiming, y);
+                y = ToggleRow(a, e, "Draw FOV circle", ref Aimbot.DrawFovCircle, y);
+                y = ChoiceRow(a, e, "Target point", ref Aimbot.VectorTargetPoint, HeadChest, y);
+                y = SliderRow(a, e, "FOV", ref Aimbot.VectorFov, 1f, 90f, "0°", y);
+                y = SliderRow(a, e, "Smoothing", ref Aimbot.VectorSmoothing, 1f, 20f, "0.0", y);
+                y = SliderRow(a, e, "Recoil control", ref Aimbot.VectorRecoil, 0f, 100f, "0%", y);
+            });
         }
 
         private static void DrawSilent(Rect area, Event e)
         {
-            area = Scroll(area, ref _scrollA1, 180f);
-            float y = 2f;
-            y = ToggleRow(area, e, "Silent aim", ref Aimbot.SilentEnabled, y);
-            y = ToggleRow(area, e, "Skip teammates", ref Aimbot.SkipTeammates, y);
-            y = ChoiceRow(area, e, "Target point", ref Aimbot.SilentTargetPoint, HeadChest, y);
-            y = SliderRow(area, e, "FOV", ref Aimbot.SilentFov, 1f, 90f, "0°", y);
+            Scroll(area, _scrollA1, 150f, a =>
+            {
+                float y = 2f;
+                y = ToggleRow(a, e, "Silent aim", ref Aimbot.SilentEnabled, y);
+                y = ToggleRow(a, e, "Skip teammates", ref Aimbot.SkipTeammates, y);
+                y = ChoiceRow(a, e, "Target point", ref Aimbot.SilentTargetPoint, HeadChest, y);
+                y = SliderRow(a, e, "FOV", ref Aimbot.SilentFov, 1f, 90f, "0°", y);
+            });
         }
 
         private static void DrawRecoil(Rect area, Event e)
         {
-            area = Scroll(area, ref _scrollA2, 120f);
-            float y = 2f;
-            y = ToggleRow(area, e, "Recoil control", ref Aimbot.RecoilEnabled, y);
-            y = SliderRow(area, e, "Strength", ref Aimbot.RecoilStrength, 0f, 100f, "0%", y);
+            Scroll(area, _scrollA2, 90f, a =>
+            {
+                float y = 2f;
+                y = ToggleRow(a, e, "Recoil control", ref Aimbot.RecoilEnabled, y);
+                y = SliderRow(a, e, "Strength", ref Aimbot.RecoilStrength, 0f, 100f, "0%", y);
+            });
         }
 
         private static readonly string[] HeadChest = { "Head", "Chest" };
 
-        private static Vector2 _scrollV;
-        private static Vector2 _scrollM;
-        private static Vector2 _scrollA0;
-        private static Vector2 _scrollA1;
-        private static Vector2 _scrollA2;
+        private class ScrollState
+        {
+            public Vector2 target;
+            public Vector2 disp;
+        }
 
-        private static Rect Scroll(Rect outer, ref Vector2 pos, float contentH)
+        private static readonly ScrollState _scrollV = new ScrollState();
+        private static readonly ScrollState _scrollM = new ScrollState();
+        private static readonly ScrollState _scrollA0 = new ScrollState();
+        private static readonly ScrollState _scrollA1 = new ScrollState();
+        private static readonly ScrollState _scrollA2 = new ScrollState();
+
+        private static void Scroll(Rect outer, ScrollState st, float contentH, Action<Rect> draw)
         {
             Rect view = new Rect(0f, 0f, outer.width - 14f, Mathf.Max(contentH, outer.height));
-            Vector2 s = GUI.BeginScrollView(outer, pos, view, GUIStyle.none, GUIStyle.none);
-            pos = s;
-            return new Rect(0f, 0f, view.width, view.height);
+            Vector2 s = GUI.BeginScrollView(outer, st.disp, view, GUIStyle.none, GUIStyle.none);
+            st.target = s;
+            st.disp = Ui.Ease(st.disp, st.target, 14f, Time.unscaledDeltaTime);
+            draw(new Rect(0f, 0f, view.width, view.height));
+            GUI.EndScrollView();
+
+            if (view.height > outer.height + 1f)
+            {
+                Rect track = new Rect(outer.x + outer.width - 8f, outer.y, 3f, outer.height);
+                Ui.RectFill(track, new Color(1f, 1f, 1f, 0.05f));
+
+                float maxScroll = view.height - outer.height;
+                float barH = Mathf.Max(40f, outer.height * (outer.height / view.height));
+                float barY = outer.y + (outer.height - barH) * Mathf.Clamp01(st.disp.y / maxScroll);
+                Ui.Tex(new Rect(track.x, barY, 3f, barH),
+                    Ui.Rounded(3, Mathf.RoundToInt(barH), 1.5f, Ui.Royal, Color.clear, 0f));
+            }
         }
 
         private static float ButtonRow(Rect area, Event e, string label, Action onClick, float y)
         {
             Rect row = new Rect(area.x, y, area.width, 32f);
             bool hover = row.Contains(e.mousePosition);
-            float hv = Anim("btn:" + label, hover ? 1f : 0f, 8f);
+            float hv = Anim("btn:" + label, hover ? 1f : 0f, 11f);
 
             Ui.Tex(row, Ui.Rounded((int)row.width, 32, 8f,
                 Color.Lerp(new Color(0.10f, 0.105f, 0.15f, 1f), Ui.RoyalDark, hv),
@@ -235,7 +285,7 @@ namespace Kerix
                 e.Use();
             }
 
-            float hv = Anim("choice:" + label, hover ? 1f : 0f, 8f);
+            float hv = Anim("choice:" + label, hover ? 1f : 0f, 11f);
             if (hv > 0.01f)
                 Ui.RectFill(new Rect(row.x, row.y, row.width, row.height),
                     new Color(Ui.Royal.r, Ui.Royal.g, Ui.Royal.b, 0.10f * hv));
@@ -261,7 +311,7 @@ namespace Kerix
             Rect hit = new Rect(area.x, y, area.width, 42f);
 
             bool hover = hit.Contains(e.mousePosition);
-            float hv = Anim("slider:" + label, hover ? 1f : 0f, 8f);
+            float hv = Anim("slider:" + label, hover ? 1f : 0f, 11f);
 
             bool active = _activeSlider == label;
             if (e.type == EventType.MouseDown && e.button == 0 && hit.Contains(e.mousePosition))
@@ -282,6 +332,7 @@ namespace Kerix
             }
 
             float t01 = Mathf.Clamp01((val - min) / (max - min));
+            float d01 = active ? t01 : Anim("sval:" + label, t01, 18f);
 
             GUIStyle ls = Ui.Style(13, anchor: TextAnchor.MiddleLeft);
             ls.normal.textColor = Color.Lerp(Ui.TextDim, Color.white, Mathf.Max(hv * 0.5f, active ? 1f : 0f));
@@ -292,9 +343,9 @@ namespace Kerix
             GUI.Label(new Rect(row.x + row.width - 76f, row.y, 70f, 20f), val.ToString(fmt), vs);
 
             Ui.RectFill(new Rect(track.x, track.y, track.width, track.height), new Color(0.13f, 0.135f, 0.175f, 1f));
-            Ui.RectFill(new Rect(track.x, track.y, track.width * t01, track.height),
-                Color.Lerp(Ui.RoyalDark, Ui.Royal, Mathf.Max(t01, hv * 0.3f)));
-            float knobX = track.x + track.width * t01;
+            Ui.RectFill(new Rect(track.x, track.y, track.width * d01, track.height),
+                Color.Lerp(Ui.RoyalDark, Ui.Royal, Mathf.Max(d01, hv * 0.3f)));
+            float knobX = track.x + track.width * d01;
             Ui.Tex(new Rect(knobX - 7f, track.y - 4f, 14f, 14f),
                 Ui.Rounded(14, 14, 7f, active ? Color.white : Ui.RoyalLight, Color.clear, 0f));
 
@@ -326,60 +377,62 @@ namespace Kerix
 
         private static void DrawVisuals(Rect area, Event e)
         {
-            area = Scroll(area, ref _scrollV, 420f);
-
-            Section(area, 0f, "PLAYERS");
-
-            float y = 24f;
-            y = ToggleRow(area, e, "Player ESP", ref Esp.Enabled, y);
-            if (Esp.Enabled)
+            Scroll(area, _scrollV, 470f, a =>
             {
-                y = ToggleRow(area, e, "Box", ref Esp.Box, y);
-                y = ToggleRow(area, e, "Fill", ref Esp.Fill, y);
-                y = ToggleRow(area, e, "Health", ref Esp.Health, y);
-                y = ToggleRow(area, e, "Name", ref Esp.Name, y);
-                y = ToggleRow(area, e, "Distance", ref Esp.Distance, y);
-                y = ToggleRow(area, e, "Snaplines", ref Esp.Snaplines, y);
-            }
+                Section(a, 0f, "PLAYERS");
 
-            y += 6f;
-            Section(area, y, "WORLD");
-            y += 24f;
-            y = ToggleRow(area, e, "Zombies", ref Esp.Zombies, y);
-            y = ToggleRow(area, e, "Vehicles", ref Esp.Vehicles, y);
-            y = ToggleRow(area, e, "Ground items", ref Esp.Items, y);
+                float y = 24f;
+                y = ToggleRow(a, e, "Player ESP", ref Esp.Enabled, y);
+                if (Esp.Enabled)
+                {
+                    y = ToggleRow(a, e, "Box", ref Esp.Box, y);
+                    y = ToggleRow(a, e, "Fill", ref Esp.Fill, y);
+                    y = ToggleRow(a, e, "Health", ref Esp.Health, y);
+                    y = ToggleRow(a, e, "Name", ref Esp.Name, y);
+                    y = ToggleRow(a, e, "Distance", ref Esp.Distance, y);
+                    y = ToggleRow(a, e, "Snaplines", ref Esp.Snaplines, y);
+                }
 
-            y += 6f;
-            Section(area, y, "HUD");
-            y += 24f;
-            y = ToggleRow(area, e, "FPS counter", ref Misc.ShowFps, y);
+                y += 6f;
+                Section(a, y, "WORLD");
+                y += 24f;
+                y = ToggleRow(a, e, "Zombies", ref Esp.Zombies, y);
+                y = ToggleRow(a, e, "Vehicles", ref Esp.Vehicles, y);
+                y = ToggleRow(a, e, "Ground items", ref Esp.Items, y);
 
-            GUIStyle hint = Ui.Style(11, anchor: TextAnchor.LowerLeft);
-            hint.normal.textColor = new Color(0.42f, 0.45f, 0.56f);
-            GUI.Label(new Rect(area.x, y + 8f, area.width, 18f),
-                "INSERT - menu      END - ESP", hint);
+                y += 6f;
+                Section(a, y, "HUD");
+                y += 24f;
+                y = ToggleRow(a, e, "FPS counter", ref Misc.ShowFps, y);
+
+                GUIStyle hint = Ui.Style(11, anchor: TextAnchor.LowerLeft);
+                hint.normal.textColor = new Color(0.42f, 0.45f, 0.56f);
+                GUI.Label(new Rect(a.x, y + 8f, a.width, 18f),
+                    "INSERT - menu      END - ESP", hint);
+            });
         }
 
         private static void DrawMisc(Rect area, Event e)
         {
-            area = Scroll(area, ref _scrollM, 300f);
+            Scroll(area, _scrollM, 320f, a =>
+            {
+                Section(a, 0f, "WEAPONS / WORLD");
 
-            Section(area, 0f, "WEAPONS / WORLD");
+                float y = 24f;
+                y = ToggleRow(a, e, "Fast reload", ref Misc.FastReloadEnabled, y);
+                if (Misc.FastReloadEnabled)
+                    y = SliderRow(a, e, "Reload speed", ref Misc.FastReload, 10f, 90f, "0%", y);
+                y = ToggleRow(a, e, "No vehicle fuel", ref Misc.NoVehicleFuel, y);
 
-            float y = 24f;
-            y = ToggleRow(area, e, "Fast reload", ref Misc.FastReloadEnabled, y);
-            if (Misc.FastReloadEnabled)
-                y = SliderRow(area, e, "Reload speed", ref Misc.FastReload, 10f, 90f, "0%", y);
-            y = ToggleRow(area, e, "No vehicle fuel", ref Misc.NoVehicleFuel, y);
-
-            y += 6f;
-            Section(area, y, "HUD");
-            y += 24f;
-            y = ToggleRow(area, e, "Radar", ref Misc.RadarEnabled, y);
-            if (Misc.RadarEnabled)
-                y = SliderRow(area, e, "Radar range", ref Misc.RadarRange, 50f, 300f, "0m", y);
-            y = ToggleRow(area, e, "Hitmarker", ref Misc.HitmarkerEnabled, y);
-            y = ToggleRow(area, e, "Hitmarker sound", ref Misc.HitmarkerSound, y);
+                y += 6f;
+                Section(a, y, "HUD");
+                y += 24f;
+                y = ToggleRow(a, e, "Radar", ref Misc.RadarEnabled, y);
+                if (Misc.RadarEnabled)
+                    y = SliderRow(a, e, "Radar range", ref Misc.RadarRange, 50f, 300f, "0m", y);
+                y = ToggleRow(a, e, "Hitmarker", ref Misc.HitmarkerEnabled, y);
+                y = ToggleRow(a, e, "Hitmarker sound", ref Misc.HitmarkerSound, y);
+            });
         }
 
         private static void DrawSettings(Rect area, Event e)
@@ -421,8 +474,8 @@ namespace Kerix
                 e.Use();
             }
 
-            float on = Anim("tgl:" + label, val ? 1f : 0f, 9f);
-            float hv = Anim("row:" + label, hover ? 1f : 0f, 8f);
+            float on = Anim("tgl:" + label, val ? 1f : 0f, 12f);
+            float hv = Anim("row:" + label, hover ? 1f : 0f, 11f);
 
             if (hv > 0.01f)
                 Ui.RectFill(new Rect(row.x, row.y, row.width - 54f, row.height),
@@ -436,8 +489,9 @@ namespace Kerix
             Color trackBd = Color.Lerp(new Color(1f, 1f, 1f, 0.08f), Ui.Royal, on);
             Ui.Tex(track, Ui.Rounded(42, 22, 11f, trackBg, trackBd, 1f));
 
-            float knobX = Mathf.Lerp(track.x + 2f, track.x + track.width - 18f, on);
-            Rect knob = new Rect(knobX, track.y + 3f, 16f, 16f);
+            float ksize = Mathf.Lerp(13f, 16f, on);
+            float cx = Mathf.Lerp(track.x + 2f + 8f, track.x + track.width - 2f - 8f, on);
+            Rect knob = new Rect(cx - ksize * 0.5f, track.y + 3f + (16f - ksize) * 0.5f, ksize, ksize);
             Ui.Tex(knob, Ui.Rounded(16, 16, 8f,
                 Color.Lerp(new Color(0.55f, 0.57f, 0.66f, 1f), Ui.RoyalLight, on), Color.clear, 0f));
 
