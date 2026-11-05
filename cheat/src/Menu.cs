@@ -31,6 +31,15 @@ namespace Kerix
             Event e = Event.current;
             Vector2 m = e.mousePosition;
 
+            // close the color popup when clicking outside the menu window and
+            // the popup; runs before everything so the click never leaks
+            if (_openColor != null && e.type == EventType.MouseDown &&
+                !PopupRect().Contains(e.mousePosition) && !_rect.Contains(e.mousePosition))
+            {
+                CloseColorPopup();
+                e.Use();
+            }
+
             float slide = (1f - Ui.Smooth(anim)) * 34f;
 
             Rect head = new Rect(_rect.x, _rect.y, _rect.width, 58f);
@@ -63,10 +72,6 @@ namespace Kerix
             GUIStyle sub = Ui.Style(11, bold: true);
             sub.normal.textColor = Ui.TextDim;
             GUI.Label(new Rect(r.x + 22f, r.y + 40f, 240f, 16f), "U N T U R N E D", sub);
-
-            GUIStyle ver = Ui.Style(12, anchor: TextAnchor.MiddleRight);
-            ver.normal.textColor = Ui.TextDim;
-            GUI.Label(new Rect(r.x + r.width - 200f, r.y + 20f, 180f, 20f), "INSERT - menu", ver);
 
             Ui.RectFill(new Rect(r.x + 20f, r.y + 62f, r.width - 40f, 1.2f), new Color(1f, 1f, 1f, 0.07f));
 
@@ -121,6 +126,8 @@ namespace Kerix
                 case 3: DrawSettings(shifted, e); break;
             }
             Ui.PopFade();
+
+            DrawColorPopup(e);
         }
 
         private static int _aimSub;
@@ -230,9 +237,18 @@ namespace Kerix
         private static void Scroll(Rect outer, ScrollState st, float contentH, Action<Rect> draw)
         {
             Rect view = new Rect(0f, 0f, outer.width - 14f, Mathf.Max(contentH, outer.height));
-            Vector2 s = GUI.BeginScrollView(outer, st.disp, view, GUIStyle.none, GUIStyle.none);
-            st.target = s;
-            st.disp = Ui.Ease(st.disp, st.target, 14f, Time.unscaledDeltaTime);
+            float maxScroll = Mathf.Max(0f, view.height - outer.height);
+
+            Event e = Event.current;
+            if (e != null && e.type == EventType.ScrollWheel && outer.Contains(e.mousePosition))
+            {
+                st.target = new Vector2(0f, Mathf.Clamp(st.target.y + e.delta.y * 24f, 0f, maxScroll));
+                e.Use();
+            }
+            st.target = new Vector2(0f, Mathf.Clamp(st.target.y, 0f, maxScroll));
+
+            GUI.BeginScrollView(outer, st.disp, view, GUIStyle.none, GUIStyle.none);
+            st.disp = Ui.Ease(st.disp, st.target, 24f, Time.unscaledDeltaTime);
             draw(new Rect(0f, 0f, view.width, view.height));
             GUI.EndScrollView();
 
@@ -241,7 +257,6 @@ namespace Kerix
                 Rect track = new Rect(outer.x + outer.width - 8f, outer.y, 3f, outer.height);
                 Ui.RectFill(track, new Color(1f, 1f, 1f, 0.05f));
 
-                float maxScroll = view.height - outer.height;
                 float barH = Mathf.Max(40f, outer.height * (outer.height / view.height));
                 float barY = outer.y + (outer.height - barH) * Mathf.Clamp01(st.disp.y / maxScroll);
                 Ui.Tex(new Rect(track.x, barY, 3f, barH),
@@ -377,11 +392,11 @@ namespace Kerix
 
         private static void DrawVisuals(Rect area, Event e)
         {
-            Scroll(area, _scrollV, 470f, a =>
+            Scroll(area, _scrollV, MeasureVisuals(), a =>
             {
-                Section(a, 0f, "PLAYERS");
-
-                float y = 24f;
+                float y = 0f;
+                Section(a, y, "PLAYERS");
+                y += 24f;
                 y = ToggleRow(a, e, "Player ESP", ref Esp.Enabled, y);
                 if (Esp.Enabled)
                 {
@@ -392,6 +407,44 @@ namespace Kerix
                     y = ToggleRow(a, e, "Distance", ref Esp.Distance, y);
                     y = ToggleRow(a, e, "Snaplines", ref Esp.Snaplines, y);
                 }
+
+                y += 6f;
+                Section(a, y, "CHAMS");
+                y += 24f;
+                y = ToggleRow(a, e, "Players", ref Chams.PlayersEnabled, y);
+                if (Chams.PlayersEnabled)
+                {
+                    y = ChoiceRow(a, e, "Player style", ref Chams.PlayersStyle, Chams.StyleNames, y);
+                    y = ColorRow(a, e, "Player color", () => Chams.PlayersColor, v => Chams.PlayersColor = v, y);
+                    y = ToggleRow(a, e, "Through walls", ref Chams.PlayersThroughWalls, y);
+                }
+
+                y = ToggleRow(a, e, "Hands", ref Chams.HandsEnabled, y);
+                if (Chams.HandsEnabled)
+                {
+                    y = ChoiceRow(a, e, "Hand style", ref Chams.HandsStyle, Chams.StyleNames, y);
+                    y = ColorRow(a, e, "Hand color", () => Chams.HandsColor, v => Chams.HandsColor = v, y);
+                }
+
+                y = ToggleRow(a, e, "Weapon", ref Chams.WeaponEnabled, y);
+                if (Chams.WeaponEnabled)
+                {
+                    y = ChoiceRow(a, e, "Weapon style", ref Chams.WeaponStyle, Chams.StyleNames, y);
+                    y = ColorRow(a, e, "Weapon color", () => Chams.WeaponColor, v => Chams.WeaponColor = v, y);
+                }
+
+                if (GlowUsed())
+                {
+                    y = SliderRow(a, e, "Glow strength", ref Chams.GlowStrength, 0f, 10f, "0.0", y);
+                    y = SliderRow(a, e, "Pulse speed", ref Chams.PulseSpeed, 0.2f, 8f, "0.0", y);
+                }
+
+                y += 6f;
+                Section(a, y, "CAMERA");
+                y += 24f;
+                y = ToggleRow(a, e, "View FOV", ref Chams.ViewFovEnabled, y);
+                if (Chams.ViewFovEnabled)
+                    y = SliderRow(a, e, "FOV", ref Chams.ViewFovValue, 60f, 130f, "0", y);
 
                 y += 6f;
                 Section(a, y, "WORLD");
@@ -405,11 +458,251 @@ namespace Kerix
                 y += 24f;
                 y = ToggleRow(a, e, "FPS counter", ref Misc.ShowFps, y);
 
-                GUIStyle hint = Ui.Style(11, anchor: TextAnchor.LowerLeft);
+                GUIStyle hint = Ui.Style(11, anchor: TextAnchor.LowerLeft, rich: true);
                 hint.normal.textColor = new Color(0.42f, 0.45f, 0.56f);
                 GUI.Label(new Rect(a.x, y + 8f, a.width, 18f),
-                    "INSERT - menu      END - ESP", hint);
+                    "ins - menu      <color=#6B94FF>tg - @KerixUnturned</color>", hint);
             });
+        }
+
+        private static bool GlowUsed()
+        {
+            return (Chams.PlayersEnabled && Chams.PlayersStyle >= 2) ||
+                   (Chams.HandsEnabled && Chams.HandsStyle >= 2) ||
+                   (Chams.WeaponEnabled && Chams.WeaponStyle >= 2);
+        }
+
+        private static float MeasureVisuals()
+        {
+            float y = 24f;
+            y += 32f;
+            if (Esp.Enabled) y += 6f * 32f;
+
+            y += 6f + 24f;
+            y = MeasureChamBlock(y, Chams.PlayersEnabled, 2f);
+            y = MeasureChamBlock(y, Chams.HandsEnabled, 1f);
+            y = MeasureChamBlock(y, Chams.WeaponEnabled, 1f);
+            if (GlowUsed()) y += 2f * 46f;
+
+            y += 6f + 24f;
+            y += 32f;
+            if (Chams.ViewFovEnabled) y += 46f;
+
+            y += 6f + 24f;
+            y += 3f * 32f;
+            y += 6f + 24f;
+            y += 32f;
+            y += 30f;
+            return y;
+        }
+
+        private static float MeasureChamBlock(float y, bool on, float extraRows)
+        {
+            y += 32f;
+            if (on) y += (1f + extraRows) * 32f;
+            return y;
+        }
+
+        private static string _openColor;
+        private static Func<Color> _getColor;
+        private static Action<Color> _setColor;
+
+        private static void OpenColorPopup(string label, Func<Color> get, Action<Color> set)
+        {
+            _openColor = label;
+            _getColor = get;
+            _setColor = set;
+        }
+
+        private static void CloseColorPopup()
+        {
+            _openColor = null;
+            _getColor = null;
+            _setColor = null;
+        }
+
+        private static Rect PopupRect()
+        {
+            const float pw = 224f, ph = 292f;
+            float x = _rect.x + _rect.width + 12f;
+            if (x + pw > Screen.width - 8f) x = _rect.x - pw - 12f;
+            float y = Mathf.Clamp(_rect.y + 66f, 8f, Mathf.Max(8f, Screen.height - ph - 8f));
+            return new Rect(x, y, pw, ph);
+        }
+
+        private static float ColorRow(Rect area, Event e, string label,
+                                      Func<Color> get, Action<Color> set, float y)
+        {
+            Rect row = new Rect(area.x, y, area.width, 30f);
+            Rect swatch = new Rect(area.x + area.width - 86f, y + 4f, 80f, 22f);
+            bool open = _openColor == label;
+            bool hover = row.Contains(e.mousePosition);
+            Color color = get();
+
+            if (swatch.Contains(e.mousePosition) && e.type == EventType.MouseDown && e.button == 0)
+            {
+                if (open) CloseColorPopup();
+                else OpenColorPopup(label, get, set);
+                e.Use();
+            }
+
+            float hv = Anim("color:" + label, hover ? 1f : 0f, 11f);
+            if (hv > 0.01f)
+                Ui.RectFill(new Rect(row.x, row.y, row.width, row.height),
+                    new Color(Ui.Royal.r, Ui.Royal.g, Ui.Royal.b, 0.10f * hv));
+
+            GUIStyle ls = Ui.Style(14, anchor: TextAnchor.MiddleLeft);
+            ls.normal.textColor = Color.Lerp(Ui.TextDim, Color.white,
+                Mathf.Max(hv * 0.5f, open ? 0.5f : 0f));
+            GUI.Label(new Rect(row.x + 6f, row.y, row.width - 96f, row.height), label, ls);
+
+            // swatch - RectFill, NOT Ui.Rounded (its cache would grow on every color change)
+            Ui.RectFill(swatch, color);
+            Ui.RectOutline(swatch, open ? Ui.RoyalLight : new Color(1f, 1f, 1f, 0.2f), 1.5f);
+
+            return y + 32f;
+        }
+
+        // ------------------------------------------------------------------
+        // color wheel popup
+        // ------------------------------------------------------------------
+
+        private static Texture2D _wheelTex;
+        private static Texture2D _svTex;
+        private static int _svHueBuilt = -1;
+
+        private static Texture2D BuildHueWheel(int size, float rOuter, float rInner)
+        {
+            Texture2D t = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            t.hideFlags = HideFlags.HideAndDontSave;
+            Color32[] px = new Color32[size * size];
+            float c = size * 0.5f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x + 0.5f - c, dy = y + 0.5f - c;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy);
+                    float a = Mathf.Clamp01((rOuter - d) / 1.5f) * Mathf.Clamp01((d - rInner) / 1.5f);
+                    Color col = a > 0f
+                        ? Color.HSVToRGB(Mathf.Repeat(Mathf.Atan2(dy, dx) / (2f * Mathf.PI), 1f), 1f, 1f)
+                        : Color.clear;
+                    col.a = a;
+                    px[y * size + x] = col;
+                }
+            }
+            t.SetPixels32(px);
+            t.Apply(false);
+            return t;
+        }
+
+        private static Texture2D GetSvTexture(int hueDeg, int w, int h)
+        {
+            if (_svTex == null)
+            {
+                _svTex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+                _svTex.hideFlags = HideFlags.HideAndDontSave;
+            }
+            if (_svTex.width != w || _svTex.height != h)
+            {
+                _svTex.Reinitialize(w, h, TextureFormat.RGBA32, false);
+                _svHueBuilt = -1;
+            }
+            if (_svHueBuilt == hueDeg) return _svTex;
+
+            Color32[] px = new Color32[w * h];
+            float hue = hueDeg / 360f;
+            for (int y = 0; y < h; y++)
+            {
+                float v = 1f - y / (float)(h - 1);
+                for (int x = 0; x < w; x++)
+                {
+                    float s = x / (float)(w - 1);
+                    Color col = Color.HSVToRGB(hue, s, v);
+                    px[y * w + x] = col;
+                }
+            }
+            _svTex.SetPixels32(px);
+            _svTex.Apply(false);
+            _svHueBuilt = hueDeg;
+            return _svTex;
+        }
+
+        private static void DrawColorPopup(Event e)
+        {
+            if (_openColor == null || _getColor == null || _setColor == null) return;
+
+            Rect p = PopupRect();
+            int pw = (int)p.width, ph = (int)p.height;
+
+            Ui.Tex(new Rect(p.x + 6f, p.y + 10f, p.width, p.height), Ui.Shadow(pw, ph, 16f, 0.55f));
+            Ui.Tex(p, Ui.Rounded(pw, ph, 12f, Ui.PanelBg, Ui.Royal, 1.5f));
+
+            GUIStyle hs = Ui.Style(11, bold: true);
+            hs.normal.textColor = Ui.RoyalLight;
+            GUI.Label(new Rect(p.x + 14f, p.y + 10f, 100f, 16f), "COLOR", hs);
+
+            Color col = _getColor();
+            float hue, sat, val;
+            Color.RGBToHSV(col, out hue, out sat, out val);
+            int hueDeg = Mathf.RoundToInt(hue * 360f) % 360;
+
+            GUIStyle hexs = Ui.Style(12, bold: true, anchor: TextAnchor.UpperRight);
+            hexs.normal.textColor = Ui.TextDim;
+            GUI.Label(new Rect(p.x + p.width - 108f, p.y + 10f, 94f, 16f),
+                "#" + ColorUtility.ToHtmlStringRGB(col), hexs);
+
+            // ---- hue wheel ----
+            const int wheelSize = 148;
+            Rect wheel = new Rect(p.x + (p.width - wheelSize) * 0.5f, p.y + 30f, wheelSize, wheelSize);
+            if (_wheelTex == null)
+                _wheelTex = BuildHueWheel(wheelSize, wheelSize * 0.5f - 1f, wheelSize * 0.5f - 24f);
+            Ui.Tex(wheel, _wheelTex);
+
+            float rOuter = wheelSize * 0.5f - 1f, rInner = wheelSize * 0.5f - 24f;
+            float rMid = (rOuter + rInner) * 0.5f;
+
+            Rect wheelHit = new Rect(wheel.x - 6f, wheel.y - 6f, wheel.width + 12f, wheel.height + 12f);
+            if ((e.type == EventType.MouseDown || e.type == EventType.MouseDrag) &&
+                e.button == 0 && wheelHit.Contains(e.mousePosition))
+            {
+                Vector2 d = e.mousePosition - wheel.center;
+                hue = Mathf.Repeat(Mathf.Atan2(d.y, d.x) / (2f * Mathf.PI), 1f);
+                _setColor(Color.HSVToRGB(hue, sat, val));
+                hueDeg = Mathf.RoundToInt(hue * 360f) % 360;
+                e.Use();
+            }
+
+            float ang = hue * 2f * Mathf.PI;
+            Vector2 mark = wheel.center + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * rMid;
+            Ui.Tex(new Rect(mark.x - 8f, mark.y - 8f, 16f, 16f),
+                Ui.Rounded(16, 16, 8f, Color.clear, Color.white, 2f));
+
+            // ---- saturation / value box ----
+            Rect sv = new Rect(p.x + 18f, p.y + 190f, p.width - 36f, 56f);
+            Ui.Tex(sv, GetSvTexture(hueDeg, (int)sv.width, (int)sv.height));
+
+            if ((e.type == EventType.MouseDown || e.type == EventType.MouseDrag) &&
+                e.button == 0 && sv.Contains(e.mousePosition))
+            {
+                sat = Mathf.Clamp01((e.mousePosition.x - sv.x) / sv.width);
+                val = 1f - Mathf.Clamp01((e.mousePosition.y - sv.y) / sv.height);
+                _setColor(Color.HSVToRGB(hue, sat, val));
+                e.Use();
+            }
+
+            Vector2 svm = new Vector2(sv.x + sat * sv.width, sv.y + (1f - val) * sv.height);
+            Ui.Tex(new Rect(svm.x - 6f, svm.y - 6f, 12f, 12f),
+                Ui.Rounded(12, 12, 6f, Color.clear, Color.white, 1.6f));
+
+            // ---- preview strip ----
+            Rect prev = new Rect(p.x + 18f, p.y + p.height - 34f, p.width - 36f, 22f);
+            Ui.RectFill(prev, col);
+            Ui.RectOutline(prev, new Color(1f, 1f, 1f, 0.2f), 1.5f);
+            GUIStyle ps = Ui.Style(12, bold: true, anchor: TextAnchor.MiddleCenter);
+            float lum = col.r * 0.3f + col.g * 0.6f + col.b * 0.1f;
+            ps.normal.textColor = lum > 0.55f ? new Color(0.06f, 0.06f, 0.09f, 0.95f) : Color.white;
+            GUI.Label(prev, "#" + ColorUtility.ToHtmlStringRGB(col), ps);
         }
 
         private static void DrawMisc(Rect area, Event e)
@@ -455,11 +748,12 @@ namespace Kerix
             y += 10f;
             Section(area, y, "ABOUT");
             y += 24f;
-            GUIStyle ab = Ui.Style(12);
+            GUIStyle ab = Ui.Style(12, rich: true);
             ab.normal.textColor = Ui.TextDim;
             GUI.Label(new Rect(area.x + 6f, y, area.width, 18f), "Kerix.zyx  v1.0", ab);
             y += 18f;
-            GUI.Label(new Rect(area.x + 6f, y, area.width, 18f), "INSERT - menu      END - ESP", ab);
+            GUI.Label(new Rect(area.x + 6f, y, area.width, 18f),
+                "ins - menu      <color=#6B94FF>tg - @KerixUnturned</color>", ab);
         }
 
         private static float ToggleRow(Rect area, Event e, string label, ref bool val, float y)

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Reflection;
 using System.Text;
 using UnityEngine;
 
@@ -49,6 +48,16 @@ namespace Kerix
                 v => { int r; if (int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out r)) set(r); });
         }
 
+        private static void Hex(string key, Func<Color> get, Action<Color> set)
+        {
+            Add(key, () => "#" + ColorUtility.ToHtmlStringRGB(get()),
+                v =>
+                {
+                    Color c;
+                    if (ColorUtility.TryParseHtmlString(v.StartsWith("#") ? v : "#" + v, out c)) set(c);
+                });
+        }
+
         private static void RegisterAll()
         {
             if (_registered) return;
@@ -83,6 +92,25 @@ namespace Kerix
             Bool("esp.vehicles", () => Esp.Vehicles, v => Esp.Vehicles = v);
             Bool("esp.items", () => Esp.Items, v => Esp.Items = v);
 
+            Bool("chams.players", () => Chams.PlayersEnabled, v => Chams.PlayersEnabled = v);
+            Int("chams.players.style", () => Chams.PlayersStyle, v => Chams.PlayersStyle = v);
+            Hex("chams.players.color", () => Chams.PlayersColor, v => Chams.PlayersColor = v);
+            Bool("chams.players.walls", () => Chams.PlayersThroughWalls, v => Chams.PlayersThroughWalls = v);
+
+            Bool("chams.hands", () => Chams.HandsEnabled, v => Chams.HandsEnabled = v);
+            Int("chams.hands.style", () => Chams.HandsStyle, v => Chams.HandsStyle = v);
+            Hex("chams.hands.color", () => Chams.HandsColor, v => Chams.HandsColor = v);
+
+            Bool("chams.weapon", () => Chams.WeaponEnabled, v => Chams.WeaponEnabled = v);
+            Int("chams.weapon.style", () => Chams.WeaponStyle, v => Chams.WeaponStyle = v);
+            Hex("chams.weapon.color", () => Chams.WeaponColor, v => Chams.WeaponColor = v);
+
+            Float("chams.glow", () => Chams.GlowStrength, v => Chams.GlowStrength = v);
+            Float("chams.pulse", () => Chams.PulseSpeed, v => Chams.PulseSpeed = v);
+
+            Bool("view.fov.enabled", () => Chams.ViewFovEnabled, v => Chams.ViewFovEnabled = v);
+            Float("view.fov.value", () => Chams.ViewFovValue, v => Chams.ViewFovValue = v);
+
             Bool("misc.speed.enabled", () => Misc.SpeedEnabled, v => Misc.SpeedEnabled = v);
             Float("misc.speed.mult", () => Misc.SpeedMult, v => Misc.SpeedMult = v);
             Bool("misc.jump.enabled", () => Misc.JumpEnabled, v => Misc.JumpEnabled = v);
@@ -97,18 +125,24 @@ namespace Kerix
             Bool("misc.hitmarkerSound", () => Misc.HitmarkerSound, v => Misc.HitmarkerSound = v);
         }
 
+        private const string ConfigDir = "C:\\DexionDeveloper\\KerixUnturn3d";
+
         private static string FilePath
         {
-            get
+            get { return Path.Combine(ConfigDir, "kerix.krx"); }
+        }
+
+        private static bool EnsureDir()
+        {
+            try
             {
-                try
-                {
-                    string dir = Assembly.GetExecutingAssembly().Location;
-                    if (!string.IsNullOrEmpty(dir))
-                        return Path.Combine(Path.GetDirectoryName(dir), "kerix.krx");
-                }
-                catch { }
-                return "kerix.krx";
+                if (!Directory.Exists(ConfigDir))
+                    Directory.CreateDirectory(ConfigDir);
+                return true;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -117,6 +151,11 @@ namespace Kerix
             RegisterAll();
             try
             {
+                if (!EnsureDir())
+                {
+                    Flash("Save failed: cannot create " + ConfigDir);
+                    return;
+                }
                 StringBuilder sb = new StringBuilder();
                 sb.AppendLine("KRXCFG1");
                 sb.AppendLine("# Kerix.zyx config");

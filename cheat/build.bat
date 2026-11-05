@@ -17,6 +17,6 @@ cd /d "%~dp0"
   -r:"%REF%\UnityEngine.TextRenderingModule.dll" ^
   -r:"libs\Vault.dll" ^
   -r:"%REF%\com.rlabrecque.steamworks.net.dll" ^
-  -out:Kerix.dll src\Loader.cs src\KerixMain.cs src\Ui.cs src\Menu.cs src\Esp.cs src\Aimbot.cs src\Misc.cs src\Config.cs || exit /b 1
+  -out:Kerix.dll src\Loader.cs src\KerixMain.cs src\Ui.cs src\Menu.cs src\Esp.cs src\Aimbot.cs src\Misc.cs src\Config.cs src\Chams.cs || exit /b 1
 
 echo [+] built: Kerix.dll

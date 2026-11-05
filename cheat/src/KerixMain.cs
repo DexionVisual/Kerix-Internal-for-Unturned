@@ -54,6 +54,7 @@ namespace Kerix
 
             Aimbot.UpdateTick();
             Misc.UpdateTick();
+            Chams.UpdateTick();
 
             float raw = Time.unscaledDeltaTime > 0.0001f ? 1f / Time.unscaledDeltaTime : 60f;
             _fps = Mathf.Lerp(_fps, raw, 0.05f);
