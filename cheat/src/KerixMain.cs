@@ -1,4 +1,5 @@
 using System.Collections;
+using HarmonyLib;
 using SDG.Unturned;
 using UnityEngine;
 
@@ -41,6 +42,8 @@ namespace Kerix
             {
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
+                // zero any raw Input reads (axes/mouse) that bypass InputEx
+                Input.ResetInputAxes();
             }
         }
 
@@ -51,6 +54,12 @@ namespace Kerix
 
             if (Input.GetKeyDown(KeyCode.End))
                 Esp.Enabled = !Esp.Enabled;
+
+            if (MenuOpen)
+            {
+                // zero any raw Input reads (axes/mouse) that bypass InputEx
+                Input.ResetInputAxes();
+            }
 
             Aimbot.UpdateTick();
             Misc.UpdateTick();
@@ -119,6 +128,67 @@ namespace Kerix
                     e.Use();
                 }
             }
+        }
+    }
+
+    // Blocks game input while the menu is open. Unturned routes its input
+    // (keys AND mouse-button binds) through SDG.Unturned.InputEx and rotates
+    // the camera in PlayerLook.simulate - both are plain game IL that Harmony
+    // can patch. UnityEngine.Input methods are icall wrappers and CRASH this
+    // Harmony build (InvalidProgramException), so never patch those here.
+    // Insert stays reachable so the menu can still be toggled closed.
+    [HarmonyPatch]
+    internal static class InputGate
+    {
+        private static bool Block
+        {
+            get { return KerixMain.Instance != null && KerixMain.Instance.MenuOpen; }
+        }
+
+        [HarmonyPrefix]
+        [HarmonyPatch(typeof(InputEx), "GetKey")]
+        static bool GetKey(KeyCode key, ref bool __result)
+        {
+            if (!Block || key == KeyCode.Insert) return true;
+            __result = false;
+            return false;
+        }
+
+        [HarmonyPrefix]
+        [HarmonyPatch(typeof(InputEx), "GetKeyDown")]
+        static bool GetKeyDown(KeyCode key, ref bool __result)
+        {
+            if (!Block || key == KeyCode.Insert) return true;
+            __result = false;
+            return false;
+        }
+
+        [HarmonyPrefix]
+        [HarmonyPatch(typeof(InputEx), "GetKeyUp")]
+        static bool GetKeyUp(KeyCode key, ref bool __result)
+        {
+            if (!Block) return true;
+            __result = false;
+            return false;
+        }
+
+        [HarmonyPrefix]
+        [HarmonyPatch(typeof(InputEx), "ConsumeKeyDown")]
+        static bool ConsumeKeyDown(KeyCode key, ref bool __result)
+        {
+            if (!Block) return true;
+            __result = false;
+            return false;
+        }
+
+        // camera rotation: simulate receives the look deltas as arguments
+        [HarmonyPrefix]
+        [HarmonyPatch(typeof(PlayerLook), "simulate")]
+        static void SilenceLook(ref float look_x, ref float look_y)
+        {
+            if (!Block) return;
+            look_x = 0f;
+            look_y = 0f;
         }
     }
 }

@@ -10,7 +10,7 @@ namespace Kerix
         public static bool Enabled = true;
         public static bool Box = true;
         public static bool Fill;
-        public static bool Health = true;
+        public static bool Health;
         public static bool Name = true;
         public static bool Distance = true;
         public static bool Snaplines;

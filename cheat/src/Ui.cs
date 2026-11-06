@@ -138,13 +138,21 @@ namespace Kerix
             Texture2D t;
             if (_tex.TryGetValue(key, out t) && t != null) return t;
 
+            // inset the shape so the border's outer fade never touches the texture
+            // edge - otherwise straight sides render thinner than corners
+            float m = borderW > 0f ? borderW * 0.5f + 1f : 0f;
+            float bw = w - 2f * m, bh = h - 2f * m;
+            float rad = Mathf.Max(0f, radius - m);
+
             t = new Texture2D(w, h, TextureFormat.RGBA32, false);
             Color32[] px = new Color32[w * h];
             for (int y = 0; y < h; y++)
             {
                 for (int x = 0; x < w; x++)
                 {
-                    float sd = SdRounded(x + 0.5f, y + 0.5f, w, h, radius);
+                    float sd = m > 0f
+                        ? SdRounded(x + 0.5f - m, y + 0.5f - m, bw, bh, rad)
+                        : SdRounded(x + 0.5f, y + 0.5f, w, h, radius);
                     float cov = Mathf.Clamp01(0.5f - sd);
                     float a = fill.a * cov;
                     float r = fill.r, g = fill.g, b = fill.b;

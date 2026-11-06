@@ -8,7 +8,7 @@ namespace Kerix
 
     public static class Menu
     {
-        private static Rect _rect = new Rect(90f, 70f, 570f, 505f);
+        private static Rect _rect = new Rect(90f, 70f, 720f, 440f);
         private static int _tab = 1;
         private static int _lastTab = 1;
         private static readonly string[] Tabs = { "Aimbot", "Visuals", "Misc", "Settings" };
@@ -64,7 +64,6 @@ namespace Kerix
             Rect r = new Rect(_rect.x, _rect.y + slide, _rect.width, _rect.height);
             int w = (int)r.width, h = (int)r.height;
 
-            Ui.Tex(new Rect(r.x + 6f, r.y + 10f, r.width, r.height), Ui.Shadow(w, h, 20f, 0.55f));
             Ui.Tex(r, Ui.Rounded(w, h, 16f, Ui.PanelBg, Color.clear, 0f));
             Ui.Tex(r, Ui.Rounded(w, h, 16f, Color.clear, Ui.Royal, 1.5f));
 
@@ -95,7 +94,7 @@ namespace Kerix
                         Ui.Rounded(6, 24, 3f, Ui.RoyalLight, Color.clear, 0f));
                 }
 
-                GUIStyle ts = Ui.Style(15, bold: sel, anchor: TextAnchor.MiddleCenter);
+                GUIStyle ts = Ui.Style(13, bold: sel, anchor: TextAnchor.MiddleCenter);
                 ts.normal.textColor = Color.Lerp(Ui.TextDim, Color.white, Mathf.Max(hv * 0.6f, sv));
                 GUI.Label(tr, Tabs[i], ts);
 
@@ -274,7 +273,7 @@ namespace Kerix
                 Color.Lerp(new Color(0.10f, 0.105f, 0.15f, 1f), Ui.RoyalDark, hv),
                 Color.Lerp(new Color(1f, 1f, 1f, 0.08f), Ui.Royal, hv), 1f));
 
-            GUIStyle bs = Ui.Style(13, bold: true, anchor: TextAnchor.MiddleCenter);
+            GUIStyle bs = Ui.Style(12, bold: true, anchor: TextAnchor.MiddleCenter);
             bs.normal.textColor = Color.Lerp(Ui.TextDim, Color.white, hv);
             GUI.Label(row, label, bs);
 
@@ -305,13 +304,13 @@ namespace Kerix
                 Ui.RectFill(new Rect(row.x, row.y, row.width, row.height),
                     new Color(Ui.Royal.r, Ui.Royal.g, Ui.Royal.b, 0.10f * hv));
 
-            GUIStyle ls = Ui.Style(14, anchor: TextAnchor.MiddleLeft);
+            GUIStyle ls = Ui.Style(12, anchor: TextAnchor.MiddleLeft);
             ls.normal.textColor = Color.Lerp(Ui.TextDim, Color.white, hv * 0.5f);
             GUI.Label(new Rect(row.x + 6f, row.y, row.width - 96f, row.height), label, ls);
 
             Ui.Tex(btn, Ui.Rounded(80, 24, 7f,
                 new Color(0.10f, 0.105f, 0.15f, 1f), new Color(1f, 1f, 1f, 0.08f), 1f));
-            GUIStyle bs = Ui.Style(12, bold: true, anchor: TextAnchor.MiddleCenter);
+            GUIStyle bs = Ui.Style(11, bold: true, anchor: TextAnchor.MiddleCenter);
             bs.normal.textColor = Ui.RoyalLight;
             GUI.Label(btn, options[val], bs);
 
@@ -332,12 +331,14 @@ namespace Kerix
             if (e.type == EventType.MouseDown && e.button == 0 && hit.Contains(e.mousePosition))
             {
                 _activeSlider = label;
+                float t0 = Mathf.Clamp01((e.mousePosition.x - track.x) / track.width);
+                val = Mathf.Round((min + t0 * (max - min)) * 100f) / 100f;
                 e.Use();
             }
-            if (active && e.type == EventType.MouseDrag && e.button == 0)
+            if (active && (e.type == EventType.MouseDrag || e.type == EventType.MouseMove) && e.button == 0)
             {
                 float t = Mathf.Clamp01((e.mousePosition.x - track.x) / track.width);
-                val = Mathf.Round((min + t * (max - min)) * 10f) / 10f;
+                val = min + t * (max - min);
                 e.Use();
             }
             if (active && e.type == EventType.MouseUp)
@@ -349,11 +350,11 @@ namespace Kerix
             float t01 = Mathf.Clamp01((val - min) / (max - min));
             float d01 = active ? t01 : Anim("sval:" + label, t01, 18f);
 
-            GUIStyle ls = Ui.Style(13, anchor: TextAnchor.MiddleLeft);
+            GUIStyle ls = Ui.Style(12, anchor: TextAnchor.MiddleLeft);
             ls.normal.textColor = Color.Lerp(Ui.TextDim, Color.white, Mathf.Max(hv * 0.5f, active ? 1f : 0f));
             GUI.Label(new Rect(row.x + 6f, row.y, row.width - 70f, 20f), label, ls);
 
-            GUIStyle vs = Ui.Style(13, bold: true, anchor: TextAnchor.UpperRight);
+            GUIStyle vs = Ui.Style(12, bold: true, anchor: TextAnchor.UpperRight);
             vs.normal.textColor = Ui.RoyalLight;
             GUI.Label(new Rect(row.x + row.width - 76f, row.y, 70f, 20f), val.ToString(fmt), vs);
 
@@ -402,7 +403,6 @@ namespace Kerix
                 {
                     y = ToggleRow(a, e, "Box", ref Esp.Box, y);
                     y = ToggleRow(a, e, "Fill", ref Esp.Fill, y);
-                    y = ToggleRow(a, e, "Health", ref Esp.Health, y);
                     y = ToggleRow(a, e, "Name", ref Esp.Name, y);
                     y = ToggleRow(a, e, "Distance", ref Esp.Distance, y);
                     y = ToggleRow(a, e, "Snaplines", ref Esp.Snaplines, y);
@@ -457,11 +457,6 @@ namespace Kerix
                 Section(a, y, "HUD");
                 y += 24f;
                 y = ToggleRow(a, e, "FPS counter", ref Misc.ShowFps, y);
-
-                GUIStyle hint = Ui.Style(11, anchor: TextAnchor.LowerLeft, rich: true);
-                hint.normal.textColor = new Color(0.42f, 0.45f, 0.56f);
-                GUI.Label(new Rect(a.x, y + 8f, a.width, 18f),
-                    "ins - menu      <color=#6B94FF>tg - @KerixUnturned</color>", hint);
             });
         }
 
@@ -476,7 +471,7 @@ namespace Kerix
         {
             float y = 24f;
             y += 32f;
-            if (Esp.Enabled) y += 6f * 32f;
+            if (Esp.Enabled) y += 5f * 32f;
 
             y += 6f + 24f;
             y = MeasureChamBlock(y, Chams.PlayersEnabled, 2f);
@@ -492,7 +487,6 @@ namespace Kerix
             y += 3f * 32f;
             y += 6f + 24f;
             y += 32f;
-            y += 30f;
             return y;
         }
 
@@ -551,7 +545,7 @@ namespace Kerix
                 Ui.RectFill(new Rect(row.x, row.y, row.width, row.height),
                     new Color(Ui.Royal.r, Ui.Royal.g, Ui.Royal.b, 0.10f * hv));
 
-            GUIStyle ls = Ui.Style(14, anchor: TextAnchor.MiddleLeft);
+            GUIStyle ls = Ui.Style(12, anchor: TextAnchor.MiddleLeft);
             ls.normal.textColor = Color.Lerp(Ui.TextDim, Color.white,
                 Mathf.Max(hv * 0.5f, open ? 0.5f : 0f));
             GUI.Label(new Rect(row.x + 6f, row.y, row.width - 96f, row.height), label, ls);
@@ -635,7 +629,6 @@ namespace Kerix
             Rect p = PopupRect();
             int pw = (int)p.width, ph = (int)p.height;
 
-            Ui.Tex(new Rect(p.x + 6f, p.y + 10f, p.width, p.height), Ui.Shadow(pw, ph, 16f, 0.55f));
             Ui.Tex(p, Ui.Rounded(pw, ph, 12f, Ui.PanelBg, Ui.Royal, 1.5f));
 
             GUIStyle hs = Ui.Style(11, bold: true);
@@ -730,7 +723,7 @@ namespace Kerix
 
         private static void DrawSettings(Rect area, Event e)
         {
-            Section(area, area.y, "CONFIG (.krx)");
+            Section(area, area.y, "CONFIG");
 
             float y = area.y + 24f;
             y = ButtonRow(area, e, "Save config", Config.Save, y);
@@ -750,7 +743,7 @@ namespace Kerix
             y += 24f;
             GUIStyle ab = Ui.Style(12, rich: true);
             ab.normal.textColor = Ui.TextDim;
-            GUI.Label(new Rect(area.x + 6f, y, area.width, 18f), "Kerix.zyx  v1.0", ab);
+            GUI.Label(new Rect(area.x + 6f, y, area.width, 18f), "Kerix.xyz  v2.0", ab);
             y += 18f;
             GUI.Label(new Rect(area.x + 6f, y, area.width, 18f),
                 "ins - menu      <color=#6B94FF>tg - @KerixUnturned</color>", ab);
@@ -775,7 +768,7 @@ namespace Kerix
                 Ui.RectFill(new Rect(row.x, row.y, row.width - 54f, row.height),
                     new Color(Ui.Royal.r, Ui.Royal.g, Ui.Royal.b, 0.10f * hv));
 
-            GUIStyle ls = Ui.Style(14, anchor: TextAnchor.MiddleLeft);
+            GUIStyle ls = Ui.Style(12, anchor: TextAnchor.MiddleLeft);
             ls.normal.textColor = Color.Lerp(Ui.TextDim, Color.white, Mathf.Max(on, hv * 0.5f));
             GUI.Label(new Rect(row.x + 6f, row.y, row.width - 60f, row.height), label, ls);
 
