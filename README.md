@@ -27,7 +27,7 @@ Internal cheat for Unturned
 - FPS counter
 
 ## Exploit 
--Climb boost - work 
+- Climb boost - work 
 - Speed (desync, not work)
 - Jump (desync, not work)
 
