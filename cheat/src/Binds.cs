@@ -113,6 +113,7 @@ namespace Kerix
                 });
             Register("movement.climb", "Climb Boost", () => Movement.ClimbBoostEnabled, v => Movement.ClimbBoostEnabled = v);
             Register("exploit.vsteer", "Steering Overflow", () => VehicleSteer.SteerEnabled, v => VehicleSteer.SteerEnabled = v);
+            Register("exploit.instantEquip", "Instant Equip", () => InstantEquip.Enabled, v => InstantEquip.Enabled = v);
             Register("misc.fastreload", "Fast Reload", () => Misc.FastReloadEnabled, v => Misc.FastReloadEnabled = v);
             Register("misc.nofuel", "No Vehicle Fuel", () => Misc.NoVehicleFuel, v => Misc.NoVehicleFuel = v);
             Register("visuals.minimap", "Minimap", () => Minimap.Enabled, v => Minimap.Enabled = v);

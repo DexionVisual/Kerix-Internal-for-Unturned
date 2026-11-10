@@ -717,6 +717,7 @@ namespace Kerix
                 if (Misc.JumpEnabled)
                     y = SliderRow(a, e, "Jump x", ref Misc.JumpMult, 1.1f, 8f, "0.0x", y);
                 y = ToggleRow(a, e, "Climb boost", ref Movement.ClimbBoostEnabled, y, "movement.climb");
+                y = ToggleRow(a, e, "Instant equip", ref InstantEquip.Enabled, y, "exploit.instantEquip");
                 y += 6f;
                 Section(a, y, "VEHICLES");
                 y += 24f;

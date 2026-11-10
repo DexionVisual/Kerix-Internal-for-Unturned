@@ -96,6 +96,7 @@ namespace Kerix
             Float("misc.jump.mult", () => Misc.JumpMult, v => Misc.JumpMult = v);
             Bool("misc.antiRubberband", () => Misc.AntiRubberband, v => Misc.AntiRubberband = v);
             Bool("movement.climb", () => Movement.ClimbBoostEnabled, v => Movement.ClimbBoostEnabled = v);
+            Bool("exploit.instantEquip.enabled", () => InstantEquip.Enabled, v => InstantEquip.Enabled = v);
             Bool("exploit.vsteer.enabled", () => VehicleSteer.SteerEnabled, v => VehicleSteer.SteerEnabled = v);
             Bool("movement.autoSyncOnDisable", () => Movement.AutoSyncOnDisable, v => Movement.AutoSyncOnDisable = v);
             Bool("movement.autoSyncLeash", () => Movement.AutoSyncLeash, v => Movement.AutoSyncLeash = v);
