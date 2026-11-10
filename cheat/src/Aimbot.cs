@@ -284,7 +284,7 @@ namespace Kerix
                         float speed = velB.magnitude;
                         if (speed < 0.1f) speed = 1f;
                         Vector3 launch = dir;
-                        if (BallisticsEnabled && local != null)
+                        if (false)
                         {
                             float mv, gm;
                             if (GetGunParams(local, out mv, out gm) && mv > 1f)
