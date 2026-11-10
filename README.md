@@ -26,13 +26,14 @@ Internal cheat for Unturned
 - Always day
 - FPS counter
 
-## Misc
-
+## Exploit 
+- Climb boost - work 
 - Speed (desync, not work)
 - Jump (desync, not work)
-- Climb boost 
-- Fast reload
-- No vehicle fuel
+
+## Misc 
+- Fast reload (not work)
+- No vehicle fuel (not work)
 - Hitmarker
 
 ## Hotkeys и HUD
