@@ -1,60 +1,54 @@
 # Kerix.zyx
 
+[![KerixUnturned](https://shields.io)](https://discord.gg/MHvG7F97j)
+
 ![status](https://img.shields.io/badge/STATUS-UNDETECTED-brightgreen?style=for-the-badge)
 
-internal чит для unturned
+Internal cheat for Unturned
 
-## что умеет
+## Aimbot
 
-**aimbot**
-- vector aim: сводит сам прицел, fov круг, сглаживание от мгновенного до
-  плавного, цель на голову или грудь
-- silent aim: пули летят в цель, прицел остается на месте. работает через
-  правку BulletInfo после создания, до баллистики
-- контроль отдачи: гасит кик на заданный процент, можно отдельно от аимбота
-- все настройки в отдельных подтабах
+- Silent aim
+- Skip teammates
+- Баллистика
+- Recoil control
 
-**esp**
-- игроки: бокс, хп, ник, дистанция, линии, высота бокса подстраивается под позу
-- зомби (мега/босс/радиактивный отдельным цветом)
-- машины + hp и топливо
-- предметы на земле, цвет по редкости
-- фпс каунтер
-- чамсы (настройка цветов)
-- изменение fov 
+## Visuals
 
-**misc**
-- радар (игроки, тиммейты другим цветом, техника, дальность настраивается)
-- хитмаркер
-- фаст перезарядка (я незнаю рабоате или нет)
-- техника не жрет бензин (я незнаю работает или нет)
+- Player ESP
+- ESP зомби
+- ESP техники
+- ESP предметов
+- Chams
+- Миникарта
+- Freecam
+- View FOV
+- Always day
+- FPS counter
 
-**прочее**
-- конфиги в .krx файл рядом с dll (сейв/лоад/сброс в вкладке настроек)
+## Misc
 
-## сборка
+- Speed (desync, not work)
+- Jump (desync, not work)
+- Climb boost 
+- Fast reload
+- No vehicle fuel
+- Hitmarker
 
-нужна visual studio (с++ тулсет + .net 4.8 targeting pack).
+## Hotkeys и HUD
+
+- Binds
+- Панель биндов
+- HUD-редактор
+
+## Конфиг
+
+- kerix.krx
+- Автозагрузка при инжекте
+- Автосохранение
+
+## Сборка
+
+Нужна Visual Studio (C++ тулсет + .NET 4.8 targeting pack).
+
     Kerix\build.bat
-
-скрипт соберет длл и вы своим инжектором инжектите 
-
-## использование
-
-1. install: Kerix.dll и Vault.dll должны лежать рядом с Unturned.exe
-2. запустить игру
-3. заинжектить KerixLoader.dll в Unturned.exe
-4. INSERT - меню
-
-## структура
-
-    loader/bootstrap.c      нативный лоадер
-    cheat/src/*.cs          весь чит
-    cheat/libs/Vault.dll    harmony
-    build.bat               собрать все
-
----
-
-на be андетект вроде как
-
-проект сырой и будет обновляться! 

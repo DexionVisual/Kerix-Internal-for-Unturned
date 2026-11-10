@@ -5,38 +5,27 @@ using HarmonyLib;
 using SDG.Unturned;
 using Steamworks;
 using UnityEngine;
-
 namespace Kerix
 {
     public static class Aimbot
     {
-
-        public static bool VectorEnabled;
-        public static bool VectorOnlyAiming = true;
-        public static float VectorFov = 15f;
-        public static float VectorSmoothing = 5f;
-        public static int VectorTargetPoint;
-        public static float VectorRecoil;
-        public static bool DrawFovCircle = true;
-
         public static bool SilentEnabled;
         public static float SilentFov = 25f;
         public static int SilentTargetPoint;
-
+        public static bool SilentFovCircle = true;
         public static bool RecoilEnabled;
         public static float RecoilStrength = 60f;
-
+        public static bool BallisticsEnabled = true;
+        public static bool BallisticsLead = true;
+        public static bool BallisticsInfo;
         public static bool SkipTeammates = true;
-
-        public static bool VectorAimingNow;
-
         private static FieldInfo _pitchField;
         private static FieldInfo _yawField;
         private static FieldInfo _bulletsField;
         private static PropertyInfo _velocityProp;
         private static PropertyInfo _positionProp;
+        private static MethodInfo _calcGravityMethod;
         private static Material _lineMat;
-
         private static Material LineMat
         {
             get
@@ -49,7 +38,6 @@ namespace Kerix
                 return _lineMat;
             }
         }
-
         private static void InitReflection()
         {
             if (_pitchField != null) return;
@@ -59,10 +47,66 @@ namespace Kerix
             _bulletsField = typeof(UseableGun).GetField("bullets", BindingFlags.NonPublic | BindingFlags.Instance);
             _velocityProp = typeof(BulletInfo).GetProperty("velocity");
             _positionProp = typeof(BulletInfo).GetProperty("position");
-            Loader.Log("Aimbot reflection: pitch=" + (_pitchField != null) + " yaw=" + (_yawField != null)
-                       + " bullets=" + (_bulletsField != null) + " velocity=" + (_velocityProp != null));
+            _calcGravityMethod = typeof(UseableGun).GetMethod("CalculateBulletGravityMultiplier",
+                BindingFlags.NonPublic | BindingFlags.Instance);
         }
-
+        internal const float BALLISTICS_DELTA_TIME = 0.02f;
+        private const float GravityMag = 9.81f;
+        public static string WeaponInfoLine
+        {
+            get
+            {
+                Player local = Player.LocalPlayer;
+                if (local == null || local.equipment == null) return "";
+                ItemGunAsset ga = local.equipment.asset as ItemGunAsset;
+                if (ga == null) return "no gun";
+                float mv, gm;
+                if (!GetGunParams(local, out mv, out gm)) return "no gun";
+                float t = 100f / mv;
+                float drop = 0.5f * GravityMag * gm * t * Mathf.Max(0f, t - BALLISTICS_DELTA_TIME);
+                return ga.itemName + "  " + Mathf.RoundToInt(mv) + " m/s  drop@100m " + drop.ToString("F2") + "m";
+            }
+        }
+        private static bool GetGunParams(Player local, out float muzzleVelocity, out float gravityMult)
+        {
+            muzzleVelocity = 0f;
+            gravityMult = 1f;
+            try
+            {
+                UseableGun gun = local.equipment != null ? local.equipment.useable as UseableGun : null;
+                ItemGunAsset ga = local.equipment != null ? local.equipment.asset as ItemGunAsset : null;
+                if (gun == null || ga == null) return false;
+                muzzleVelocity = ga.muzzleVelocity;
+                if (muzzleVelocity < 1f) return false;
+                if (_calcGravityMethod != null)
+                {
+                    object r = _calcGravityMethod.Invoke(gun, null);
+                    if (r is float) gravityMult = (float)r;
+                }
+                else
+                {
+                    gravityMult = ga.bulletGravityMultiplier;
+                }
+                return true;
+            }
+            catch { return false; }
+        }
+        private static Vector3 SolveBallistic(Vector3 origin, Vector3 target, Vector3 targetVel,
+                                              float speed, float gravityMult)
+        {
+            float g = GravityMag * gravityMult;
+            if (g <= 0f) return target;
+            float t = Vector3.Distance(origin, target) / speed;
+            Vector3 lead = target;
+            for (int i = 0; i < 3; i++)
+            {
+                Vector3 future = BallisticsLead ? target + targetVel * t : target;
+                float drop = 0.5f * g * t * Mathf.Max(0f, t - BALLISTICS_DELTA_TIME);
+                lead = future + Vector3.up * drop;
+                t = Vector3.Distance(origin, lead) / speed;
+            }
+            return lead;
+        }
         private static float StanceHeight(Player p)
         {
             try
@@ -78,12 +122,10 @@ namespace Kerix
             }
             catch { return 1.95f; }
         }
-
         private static float PointHeightFraction(int pointIndex)
         {
             return pointIndex == 0 ? 0.93f : 0.60f;
         }
-
         private static bool IsTeammate(Player local, SteamPlayer sp)
         {
             try
@@ -99,20 +141,72 @@ namespace Kerix
             }
             catch { return false; }
         }
-
+        private class VelTrack
+        {
+            public Vector3 Pos;
+            public float Time;
+            public Vector3 Vel;
+        }
+        private static readonly Dictionary<SteamPlayer, VelTrack> _velTracks =
+            new Dictionary<SteamPlayer, VelTrack>();
+        private static void TrackVelocities()
+        {
+            List<SteamPlayer> clients = Provider.clients;
+            if (clients == null) return;
+            if (_velTracks.Count > 64) _velTracks.Clear();
+            float now = Time.realtimeSinceStartup;
+            for (int i = 0; i < clients.Count; i++)
+            {
+                SteamPlayer sp = clients[i];
+                if (sp == null || sp.player == null) continue;
+                try
+                {
+                    Vector3 pos = sp.player.transform.position;
+                    VelTrack t;
+                    if (!_velTracks.TryGetValue(sp, out t))
+                    {
+                        _velTracks[sp] = new VelTrack { Pos = pos, Time = now, Vel = Vector3.zero };
+                        continue;
+                    }
+                    float dt = now - t.Time;
+                    if (dt > 1f)
+                    {
+                        t.Pos = pos;
+                        t.Time = now;
+                        t.Vel = Vector3.zero;
+                        continue;
+                    }
+                    if (dt < 0.02f) continue;
+                    Vector3 v = (pos - t.Pos) / dt;
+                    t.Vel = Vector3.Lerp(t.Vel, v, 0.45f);
+                    t.Pos = pos;
+                    t.Time = now;
+                }
+                catch { }
+            }
+        }
+        private static Vector3 VelocityOf(SteamPlayer sp)
+        {
+            VelTrack t;
+            if (sp != null && _velTracks.TryGetValue(sp, out t)) return t.Vel;
+            return Vector3.zero;
+        }
         public static bool FindTargetPoint(float fovDeg, int pointIndex, out Vector3 point)
         {
+            Vector3 vel;
+            return FindTargetPoint(fovDeg, pointIndex, out point, out vel);
+        }
+        public static bool FindTargetPoint(float fovDeg, int pointIndex, out Vector3 point, out Vector3 targetVel)
+        {
             point = Vector3.zero;
+            targetVel = Vector3.zero;
             Camera cam = Camera.main;
             Player local = Player.LocalPlayer;
             if (cam == null || local == null) return false;
-
             List<SteamPlayer> clients = Provider.clients;
             if (clients == null) return false;
-
             float frac = PointHeightFraction(pointIndex);
             float best = fovDeg;
-
             for (int i = 0; i < clients.Count; i++)
             {
                 SteamPlayer sp = clients[i];
@@ -122,189 +216,48 @@ namespace Kerix
                     Player p = sp.player;
                     if (p.life == null || p.life.isDead) continue;
                     if (IsTeammate(local, sp)) continue;
-
                     Vector3 target = p.transform.position + Vector3.up * (StanceHeight(p) * frac);
                     Vector3 dir = target - cam.transform.position;
                     float dist = dir.magnitude;
                     if (dist < 0.5f) continue;
                     dir /= dist;
-
                     float angle = Vector3.Angle(cam.transform.forward, dir);
                     if (angle < best)
                     {
                         best = angle;
                         point = target;
+                        targetVel = VelocityOf(sp);
                     }
                 }
                 catch { }
             }
             return best < fovDeg;
         }
-
-        private static bool IsAimingGun(Player local)
-        {
-            try
-            {
-                UseableGun gun = local.equipment != null ? local.equipment.useable as UseableGun : null;
-                return gun != null && gun.isAiming;
-            }
-            catch { return false; }
-        }
-
-        private static Vector3 _targetPoint;
-        private static bool _hasTarget;
-
-        private static float _lastYaw;
-        private static float _lastPitch;
-        private static bool _hasLast;
-        private static float _lastRealtime;
-
         public static void UpdateTick()
         {
-            _hasTarget = false;
-            VectorAimingNow = false;
-            if (!VectorEnabled) return;
-            if (KerixMain.Instance != null && KerixMain.Instance.MenuOpen) return;
-
-            Player local = Player.LocalPlayer;
-            if (local == null || local.look == null || !local.life.IsAlive) return;
-            if (VectorOnlyAiming && !IsAimingGun(local)) return;
-
-            Vector3 point;
-            if (!FindTargetPoint(VectorFov, VectorTargetPoint, out point)) return;
-
-            _targetPoint = point;
-            _hasTarget = true;
-            VectorAimingNow = true;
+            TrackVelocities();
         }
-
-        private static void AnglesTo(Vector3 point, out float yaw, out float pitch)
-        {
-            Camera cam = Camera.main;
-            Vector3 eye = cam != null ? cam.transform.position : Vector3.zero;
-            Vector3 dir = point - eye;
-            float dist = dir.magnitude;
-            dir = dist > 0.001f ? dir / dist : Vector3.forward;
-
-            yaw = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
-            pitch = 90f + Mathf.Asin(Mathf.Clamp(dir.y, -1f, 1f)) * Mathf.Rad2Deg;
-        }
-
-        private static void SteerLook(ref float lookX, ref float lookY)
-        {
-            if (!_hasTarget)
-            {
-                _hasLast = false;
-                return;
-            }
-
-            float targetYaw, targetPitch;
-            AnglesTo(_targetPoint, out targetYaw, out targetPitch);
-
-            if (!_hasLast)
-            {
-
-                Player local = Player.LocalPlayer;
-                if (local == null || local.look == null) return;
-                _lastYaw = local.look.yaw;
-                _lastPitch = local.look.pitch;
-                _hasLast = true;
-                _lastRealtime = Time.realtimeSinceStartup;
-            }
-
-            float dt = Mathf.Clamp(Time.realtimeSinceStartup - _lastRealtime, 0.001f, 0.1f);
-            _lastRealtime = Time.realtimeSinceStartup;
-
-            float dy = Mathf.Repeat(targetYaw - _lastYaw + 180f, 360f) - 180f;
-            float dp = targetPitch - _lastPitch;
-
-            float smooth = Mathf.Max(1f, VectorSmoothing);
-            float k = Mathf.Clamp01(dt * (30f / smooth));
-            if (smooth <= 1.01f) k = 1f;
-
-            _lastYaw += dy * k;
-            _lastPitch += dp * k;
-
-            lookX = _lastYaw;
-            lookY = _lastPitch;
-        }
-
-        public static void DrawFovOverlay()
-        {
-            if (!VectorEnabled || !DrawFovCircle) return;
-            if (VectorOnlyAiming && KerixMain.Instance != null && KerixMain.Instance.MenuOpen) { }
-            if (Event.current == null || Event.current.type != EventType.Repaint) return;
-
-            Camera cam = Camera.main;
-            if (cam == null) return;
-
-            Material m = LineMat;
-            if (m == null) return;
-
-            float camFov = cam.fieldOfView;
-            float radiusPx = Mathf.Tan(VectorFov * Mathf.Deg2Rad) /
-                             (2f * Mathf.Tan(camFov * 0.5f * Mathf.Deg2Rad)) * Screen.height;
-
-            Vector2 center = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
-            const int segs = 64;
-
-            GL.PushMatrix();
-            m.SetPass(0);
-            GL.LoadPixelMatrix(0f, Screen.width, Screen.height, 0f);
-            GL.Begin(GL.LINES);
-            Color c = new Color(Ui.Royal.r, Ui.Royal.g, Ui.Royal.b, 0.55f);
-            GL.Color(c);
-            for (int i = 0; i < segs; i++)
-            {
-                float a0 = i / (float)segs * Mathf.PI * 2f;
-                float a1 = (i + 1) / (float)segs * Mathf.PI * 2f;
-                GL.Vertex3(center.x + Mathf.Cos(a0) * radiusPx, center.y + Mathf.Sin(a0) * radiusPx, 0f);
-                GL.Vertex3(center.x + Mathf.Cos(a1) * radiusPx, center.y + Mathf.Sin(a1) * radiusPx, 0f);
-            }
-            GL.End();
-            GL.PopMatrix();
-        }
-
+        private static int _bulletsBefore;
         [HarmonyPatch]
         internal static class Patches
         {
-            private static int _bulletsBefore;
-
-            [HarmonyPrefix]
-            [HarmonyPatch(typeof(PlayerLook), "simulate")]
-            static void SimulatePrefix(PlayerLook __instance, ref float look_x, ref float look_y)
-            {
-                if (!VectorEnabled || !VectorAimingNow) return;
-                try
-                {
-                    if (__instance.player != Player.LocalPlayer) return;
-                    SteerLook(ref look_x, ref look_y);
-                }
-                catch { }
-            }
-
             [HarmonyPrefix]
             [HarmonyPatch(typeof(PlayerLook), "recoil")]
             static void RecoilPrefix(ref float x, ref float y)
             {
-                float comp = 0f;
-
                 if (RecoilEnabled)
-                    comp = Mathf.Max(comp, Mathf.Clamp01(RecoilStrength / 100f));
-                if (VectorEnabled && VectorAimingNow && VectorRecoil > 0f)
-                    comp = Mathf.Max(comp, Mathf.Clamp01(VectorRecoil / 100f));
-
-                y *= 1f - comp;
-                x *= 1f - comp;
+                {
+                    float comp = Mathf.Clamp01(RecoilStrength / 100f);
+                    y *= 1f - comp;
+                    x *= 1f - comp;
+                }
             }
-
             [HarmonyPrefix]
             [HarmonyPatch(typeof(UseableGun), "fire")]
             static void FirePrefix(UseableGun __instance)
             {
                 _bulletsBefore = CountBullets(__instance);
             }
-
             [HarmonyPostfix]
             [HarmonyPatch(typeof(UseableGun), "fire")]
             static void FirePostfix(UseableGun __instance)
@@ -312,13 +265,12 @@ namespace Kerix
                 if (!SilentEnabled) return;
                 try
                 {
-                    Vector3 point;
-                    if (!FindTargetPoint(SilentFov, SilentTargetPoint, out point)) return;
-
+                    Player local = Player.LocalPlayer;
+                    Vector3 point, vel;
+                    if (!FindTargetPoint(SilentFov, SilentTargetPoint, out point, out vel)) return;
                     InitReflection();
                     List<BulletInfo> bullets = (List<BulletInfo>)_bulletsField.GetValue(__instance);
                     if (bullets == null || bullets.Count <= _bulletsBefore) return;
-
                     for (int i = _bulletsBefore; i < bullets.Count; i++)
                     {
                         BulletInfo b = bullets[i];
@@ -328,11 +280,22 @@ namespace Kerix
                         float dist = dir.magnitude;
                         if (dist < 0.1f) continue;
                         dir /= dist;
-
-                        Vector3 vel = (Vector3)_velocityProp.GetValue(b, null);
-                        float speed = vel.magnitude;
+                        Vector3 velB = (Vector3)_velocityProp.GetValue(b, null);
+                        float speed = velB.magnitude;
                         if (speed < 0.1f) speed = 1f;
-                        _velocityProp.SetValue(b, dir * speed, null);
+                        Vector3 launch = dir;
+                        if (BallisticsEnabled && local != null)
+                        {
+                            float mv, gm;
+                            if (GetGunParams(local, out mv, out gm) && mv > 1f)
+                            {
+                                Vector3 solved = SolveBallistic(origin, point, vel, speed, gm);
+                                Vector3 sd = solved - origin;
+                                float sdMag = sd.magnitude;
+                                if (sdMag > 0.1f) launch = sd / sdMag;
+                            }
+                        }
+                        _velocityProp.SetValue(b, launch * speed, null);
                         _positionProp.SetValue(b, origin, null);
                     }
                 }
@@ -341,7 +304,6 @@ namespace Kerix
                     Loader.Log("silent aim error: " + e.Message);
                 }
             }
-
             private static int CountBullets(UseableGun gun)
             {
                 try
@@ -352,6 +314,60 @@ namespace Kerix
                 }
                 catch { return 0; }
             }
+        }
+        public static bool DrawSilentLine()
+        {
+            if (!SilentEnabled) return false;
+            if (Event.current == null || Event.current.type != EventType.Repaint) return false;
+            if (KerixMain.Instance != null && KerixMain.Instance.MenuOpen) return false;
+            Camera cam = Camera.main;
+            if (cam == null) return false;
+            Vector3 point;
+            if (!FindTargetPoint(SilentFov, SilentTargetPoint, out point)) return false;
+            Vector3 s = cam.WorldToScreenPoint(point);
+            if (s.z <= 0.05f) return false;
+            Material m = LineMat;
+            if (m == null) return false;
+            float sh = Screen.height;
+            GL.PushMatrix();
+            m.SetPass(0);
+            GL.LoadPixelMatrix(0f, Screen.width, sh, 0f);
+            GL.Begin(GL.LINES);
+            GL.Color(new Color(Ui.RoyalLight.r, Ui.RoyalLight.g, Ui.RoyalLight.b, 0.55f));
+            GL.Vertex3(Screen.width * 0.5f, sh * 0.5f, 0f);
+            GL.Vertex3(s.x, sh - s.y, 0f);
+            GL.End();
+            GL.PopMatrix();
+            return true;
+        }
+        public static void DrawSilentFovCircle()
+        {
+            if (!SilentEnabled || !SilentFovCircle) return;
+            if (Event.current == null || Event.current.type != EventType.Repaint) return;
+            if (KerixMain.Instance != null && KerixMain.Instance.MenuOpen) return;
+            Camera cam = Camera.main;
+            if (cam == null) return;
+            Material m = LineMat;
+            if (m == null) return;
+            float camFov = cam.fieldOfView;
+            float radiusPx = Mathf.Tan(SilentFov * Mathf.Deg2Rad) /
+                             (2f * Mathf.Tan(camFov * 0.5f * Mathf.Deg2Rad)) * Screen.height;
+            Vector2 center = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+            const int segs = 64;
+            GL.PushMatrix();
+            m.SetPass(0);
+            GL.LoadPixelMatrix(0f, Screen.width, Screen.height, 0f);
+            GL.Begin(GL.LINES);
+            GL.Color(new Color(Ui.Royal.r, Ui.Royal.g, Ui.Royal.b, 0.4f));
+            for (int i = 0; i < segs; i++)
+            {
+                float a0 = i / (float)segs * Mathf.PI * 2f;
+                float a1 = (i + 1) / (float)segs * Mathf.PI * 2f;
+                GL.Vertex3(center.x + Mathf.Cos(a0) * radiusPx, center.y + Mathf.Sin(a0) * radiusPx, 0f);
+                GL.Vertex3(center.x + Mathf.Cos(a1) * radiusPx, center.y + Mathf.Sin(a1) * radiusPx, 0f);
+            }
+            GL.End();
+            GL.PopMatrix();
         }
     }
 }

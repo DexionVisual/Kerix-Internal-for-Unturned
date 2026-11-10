@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Reflection;
 using UnityEngine;
-
 namespace Kerix
 {
     public static class Loader
@@ -12,16 +11,13 @@ namespace Kerix
             try
             {
                 string dir = Path.GetDirectoryName(typeof(Loader).Assembly.Location) ?? ".";
-
                 AppDomain.CurrentDomain.AssemblyResolve += (s, e) =>
                 {
                     if (e.Name != null && e.Name.StartsWith("0Harmony"))
                         return Assembly.LoadFrom(Path.Combine(dir, "Vault.dll"));
                     return null;
                 };
-
                 Patcher.Apply();
-
                 GameObject go = new GameObject("Kerix");
                 UnityEngine.Object.DontDestroyOnLoad(go);
                 go.AddComponent<KerixMain>();
@@ -32,7 +28,6 @@ namespace Kerix
                 Log("Init failed: " + e);
             }
         }
-
         public static void Log(string msg)
         {
             try
@@ -43,14 +38,12 @@ namespace Kerix
             catch { }
         }
     }
-
     internal static class Patcher
     {
         public static void Apply()
         {
             HarmonyLib.Harmony harmony = new HarmonyLib.Harmony("kerix.unturned");
             harmony.PatchAll(Assembly.GetExecutingAssembly());
-
             MethodInfo askDamage = HarmonyLib.AccessTools.Method(typeof(SDG.Unturned.PlayerLife),
                 "askDamage", new[]
                 {
@@ -69,7 +62,6 @@ namespace Kerix
             {
                 Loader.Log("askDamage overload NOT found - hitmarker inactive");
             }
-
             Loader.Log("Harmony patches applied");
         }
     }
